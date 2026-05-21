@@ -4,28 +4,21 @@ import { useState } from "react";
 
 export default function DashboardPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState("");
+  const [error, setError] = useState("");
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0] || null;
-    setFile(selected);
-    setResult("");
-    setError("");
-  };
-
-  const handleSubmit = async () => {
+  async function handleUpload() {
     if (!file) {
-      setError("Please select a PDF file first.");
+      setError("Please select a resume PDF.");
       return;
     }
 
-    setLoading(true);
-    setResult("");
-    setError("");
-
     try {
+      setLoading(true);
+      setError("");
+      setResult("");
+
       const formData = new FormData();
       formData.append("resume", file);
 
@@ -37,135 +30,93 @@ export default function DashboardPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || "Something went wrong.");
-      } else {
-        setResult(data.text || "No analysis returned.");
+        if (data.error?.includes("RESOURCE_EXHAUSTED")) {
+          setError("AI quota temporarily exceeded. Please try again later.");
+        } else {
+          setError(data.error || "Something went wrong.");
+        }
+
+        return;
       }
-    } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Network error occurred.";
-      setError(message);
+
+      setResult(data.text);
+    } catch (err) {
+      console.error(err);
+      setError("Failed to analyze resume.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        backgroundColor: "#f9fafb",
-        padding: "48px 16px",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "640px",
-          margin: "0 auto",
-          backgroundColor: "#ffffff",
-          borderRadius: "16px",
-          boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-          padding: "32px",
-        }}
-      >
-        <h1
-          style={{
-            fontSize: "24px",
-            fontWeight: "700",
-            color: "#1f2937",
-            marginBottom: "8px",
-          }}
-        >
-          AI Resume Interview Assistant
-        </h1>
+    <main className="min-h-screen bg-zinc-950 text-white px-6 py-16">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-12">
+          <p className="text-sm tracking-[0.2em] uppercase text-zinc-500 mb-4">
+            AI Powered Career Platform
+          </p>
 
-        <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "24px" }}>
-          Upload your resume PDF to get an ATS score, analysis, and interview
-          questions.
-        </p>
+          <h1 className="text-5xl font-bold leading-tight mb-6">
+            AI Resume Interview Assistant
+          </h1>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "14px",
-              fontWeight: "500",
-              color: "#374151",
-              marginBottom: "8px",
-            }}
-          >
-            Select Resume (PDF only)
-          </label>
-          <input
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
-            style={{
-              display: "block",
-              width: "100%",
-              fontSize: "14px",
-              color: "#4b5563",
-            }}
-          />
-          {file && (
-            <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "6px" }}>
-              Selected: {file.name}
-            </p>
-          )}
+          <p className="text-zinc-400 text-lg leading-8 max-w-2xl">
+            Upload your resume to receive ATS analysis, resume improvement
+            suggestions, and AI-powered interview preparation insights.
+          </p>
         </div>
 
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !file}
-          style={{
-            display: "block",
-            width: "100%",
-            backgroundColor: loading || !file ? "#d1d5db" : "#2563eb",
-            color: "#ffffff",
-            fontWeight: "600",
-            fontSize: "16px",
-            padding: "12px",
-            borderRadius: "12px",
-            border: "none",
-            cursor: loading || !file ? "not-allowed" : "pointer",
-            marginTop: "16px",
-          }}
-        >
-          {loading ? "Analyzing..." : "Analyze Resume"}
-        </button>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">
+                Upload Resume (PDF)
+              </label>
 
-        {error && (
-          <div
-            style={{
-              marginTop: "24px",
-              padding: "16px",
-              backgroundColor: "#fef2f2",
-              border: "1px solid #fecaca",
-              borderRadius: "12px",
-              color: "#b91c1c",
-              fontSize: "14px",
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {error}
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    setFile(e.target.files[0]);
+                  }
+                }}
+                className="block w-full text-sm text-zinc-300
+                file:mr-4 file:py-3 file:px-5
+                file:rounded-xl file:border-0
+                file:text-sm file:font-semibold
+                file:bg-white file:text-black
+                hover:file:bg-zinc-200"
+              />
+            </div>
+
+            <button
+              onClick={handleUpload}
+              disabled={loading}
+              className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all ${
+                loading
+                  ? "bg-zinc-700 cursor-not-allowed"
+                  : "bg-white text-black hover:bg-zinc-200"
+              }`}
+            >
+              {loading ? "Analyzing Resume..." : "Analyze Resume"}
+            </button>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/30 text-red-300 p-5 rounded-2xl">
+                {error}
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {result && (
-          <div
-            style={{
-              marginTop: "24px",
-              padding: "20px",
-              backgroundColor: "#f9fafb",
-              border: "1px solid #e5e7eb",
-              borderRadius: "12px",
-              color: "#1f2937",
-              fontSize: "14px",
-              whiteSpace: "pre-wrap",
-              lineHeight: "1.7",
-            }}
-          >
-            {result}
+          <div className="mt-10 bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl">
+            <h2 className="text-3xl font-bold mb-6">Resume Analysis</h2>
+
+            <div className="whitespace-pre-wrap leading-8 text-zinc-200">
+              {result}
+            </div>
           </div>
         )}
       </div>
