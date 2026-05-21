@@ -1,213 +1,171 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "../../lib/supabase";
+import { useState } from "react";
 
 export default function DashboardPage() {
-  const router = useRouter();
+  const [file, setFile] = useState<File | null>(null);
+  const [result, setResult] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
+    setResult("");
+    setError("");
+  };
 
-  const [userEmail, setUserEmail] = useState("");
-
-  const [analysisComplete, setAnalysisComplete] = useState(false);
-
-  const [showQuestions, setShowQuestions] = useState(false);
-
-  useEffect(() => {
-    async function getUser() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        setUserEmail(user.email || "");
-      } else {
-        router.push("/login");
-      }
-    }
-
-    getUser();
-  }, [router]);
-
-  async function handleLogout() {
-    await supabase.auth.signOut();
-
-    router.push("/login");
-  }
-
-  function handleAnalyzeResume() {
-    if (!selectedFile) {
-      alert("Please upload a PDF resume first.");
+  const handleSubmit = async () => {
+    if (!file) {
+      setError("Please select a PDF file first.");
       return;
     }
 
-    setAnalysisComplete(true);
-  }
+    setLoading(true);
+    setResult("");
+    setError("");
 
-  function handleGenerateQuestions() {
-    setShowQuestions(true);
-  }
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+
+      const response = await fetch("/api/parse-resume", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Something went wrong.");
+      } else {
+        setResult(data.text || "No analysis returned.");
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Network error occurred.";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main className="min-h-screen bg-black text-white">
-      <nav className="border-b border-gray-800 px-8 py-5 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">ResumeAI</h1>
+    <main
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#f9fafb",
+        padding: "48px 16px",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: "640px",
+          margin: "0 auto",
+          backgroundColor: "#ffffff",
+          borderRadius: "16px",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+          padding: "32px",
+        }}
+      >
+        <h1
+          style={{
+            fontSize: "24px",
+            fontWeight: "700",
+            color: "#1f2937",
+            marginBottom: "8px",
+          }}
+        >
+          AI Resume Interview Assistant
+        </h1>
 
-        <div className="flex items-center gap-4">
-          <p className="text-gray-400">{userEmail}</p>
-
-          <button
-            onClick={handleLogout}
-            className="border border-gray-700 px-4 py-2 rounded-xl hover:bg-gray-900 transition"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <div className="p-8">
-        <h1 className="text-5xl font-bold mb-3">Dashboard</h1>
-
-        <p className="text-gray-400 mb-10">
-          Manage resumes, ATS analysis, and interview preparation.
+        <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "24px" }}>
+          Upload your resume PDF to get an ATS score, analysis, and interview
+          questions.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-2xl font-semibold mb-3">Resume Analysis</h2>
-
-            <p className="text-gray-400">
-              Upload your resume and get AI feedback.
-            </p>
-          </div>
-
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-2xl font-semibold mb-3">ATS Score</h2>
-
-            <p className="text-gray-400">
-              Check how ATS-friendly your resume is.
-            </p>
-          </div>
-
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6">
-            <h2 className="text-2xl font-semibold mb-3">Interview Questions</h2>
-
-            <p className="text-gray-400">
-              Generate AI interview questions instantly.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-10 bg-gray-900 border border-gray-800 rounded-2xl p-8">
-          <h2 className="text-3xl font-bold mb-4">Upload Resume</h2>
-
-          <p className="text-gray-400 mb-6">
-            Upload your resume in PDF format for AI analysis.
-          </p>
-
+        <div style={{ marginBottom: "16px" }}>
+          <label
+            style={{
+              display: "block",
+              fontSize: "14px",
+              fontWeight: "500",
+              color: "#374151",
+              marginBottom: "8px",
+            }}
+          >
+            Select Resume (PDF only)
+          </label>
           <input
             type="file"
-            accept=".pdf"
-            onChange={(e) => {
-              if (e.target.files && e.target.files[0]) {
-                setSelectedFile(e.target.files[0]);
-              }
+            accept="application/pdf"
+            onChange={handleFileChange}
+            style={{
+              display: "block",
+              width: "100%",
+              fontSize: "14px",
+              color: "#4b5563",
             }}
-            className="mb-4 block w-full text-sm text-gray-300"
           />
-
-          {selectedFile && (
-            <p className="text-green-400 mb-4">
-              Selected File: {selectedFile.name}
+          {file && (
+            <p style={{ fontSize: "12px", color: "#9ca3af", marginTop: "6px" }}>
+              Selected: {file.name}
             </p>
           )}
-
-          <div className="flex gap-4 flex-wrap">
-            <button
-              onClick={handleAnalyzeResume}
-              className="bg-white text-black px-6 py-3 rounded-xl font-semibold hover:bg-gray-200 transition"
-            >
-              Analyze Resume
-            </button>
-
-            <button
-              onClick={handleGenerateQuestions}
-              className="border border-gray-700 px-6 py-3 rounded-xl font-semibold hover:bg-gray-800 transition"
-            >
-              Generate Interview Questions
-            </button>
-          </div>
         </div>
 
-        {analysisComplete && (
-          <div className="mt-10 bg-gray-900 border border-gray-800 rounded-2xl p-8">
-            <h2 className="text-3xl font-bold mb-8">AI Resume Analysis</h2>
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !file}
+          style={{
+            display: "block",
+            width: "100%",
+            backgroundColor: loading || !file ? "#d1d5db" : "#2563eb",
+            color: "#ffffff",
+            fontWeight: "600",
+            fontSize: "16px",
+            padding: "12px",
+            borderRadius: "12px",
+            border: "none",
+            cursor: loading || !file ? "not-allowed" : "pointer",
+            marginTop: "16px",
+          }}
+        >
+          {loading ? "Analyzing..." : "Analyze Resume"}
+        </button>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <h3 className="text-2xl font-semibold mb-4">ATS Score</h3>
-
-                <p className="text-5xl font-bold text-green-400">82%</p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <h3 className="text-2xl font-semibold mb-4">Resume Strength</h3>
-
-                <p className="text-gray-300">
-                  Strong technical skills and project experience.
-                </p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <h3 className="text-2xl font-semibold mb-4">Improvements</h3>
-
-                <p className="text-gray-300">
-                  Add more measurable achievements and leadership experience.
-                </p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <h3 className="text-2xl font-semibold mb-4">
-                  Recommended Keywords
-                </h3>
-
-                <p className="text-gray-300">
-                  React.js, Next.js, TypeScript, AI, Problem Solving
-                </p>
-              </div>
-            </div>
+        {error && (
+          <div
+            style={{
+              marginTop: "24px",
+              padding: "16px",
+              backgroundColor: "#fef2f2",
+              border: "1px solid #fecaca",
+              borderRadius: "12px",
+              color: "#b91c1c",
+              fontSize: "14px",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {error}
           </div>
         )}
 
-        {showQuestions && (
-          <div className="mt-10 bg-gray-900 border border-gray-800 rounded-2xl p-8">
-            <h2 className="text-3xl font-bold mb-8">AI Interview Questions</h2>
-
-            <div className="space-y-4">
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <p>1. Explain the difference between React and Next.js.</p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <p>2. What is server-side rendering in Next.js?</p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <p>3. Explain your AI Resume Assistant project architecture.</p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <p>4. How does authentication work using Supabase?</p>
-              </div>
-
-              <div className="bg-black border border-gray-800 rounded-2xl p-6">
-                <p>
-                  5. Describe a challenge you faced while building this project.
-                </p>
-              </div>
-            </div>
+        {result && (
+          <div
+            style={{
+              marginTop: "24px",
+              padding: "20px",
+              backgroundColor: "#f9fafb",
+              border: "1px solid #e5e7eb",
+              borderRadius: "12px",
+              color: "#1f2937",
+              fontSize: "14px",
+              whiteSpace: "pre-wrap",
+              lineHeight: "1.7",
+            }}
+          >
+            {result}
           </div>
         )}
       </div>
