@@ -2,7 +2,19 @@
 
 import { motion } from "framer-motion";
 
+import { useRouter } from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
+
 export default function Sidebar() {
+  const router = useRouter();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+
+    router.push("/login");
+  }
+
   return (
     <aside className="hidden lg:flex w-[280px] border-r border-zinc-800 bg-zinc-950 flex-col p-8">
       <div className="mb-14">
@@ -39,7 +51,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto">
+      <div className="mt-auto space-y-4">
         <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6">
           <p className="text-sm text-zinc-500 mb-4">AI STATUS</p>
 
@@ -49,6 +61,13 @@ export default function Sidebar() {
             <p className="text-sm text-zinc-300">Systems Operational</p>
           </div>
         </div>
+
+        <button
+          onClick={handleLogout}
+          className="w-full bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-all text-red-300 py-4 rounded-2xl font-medium"
+        >
+          Logout
+        </button>
       </div>
     </aside>
   );
