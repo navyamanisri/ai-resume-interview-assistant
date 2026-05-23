@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pdfParse from "pdf-parse";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
 
 async function extractTextFromPDF(buffer: Buffer): Promise<string> {
   const data = await pdfParse(buffer);
-
   return data.text.trim();
 }
 
@@ -25,19 +25,17 @@ export async function POST(req: NextRequest) {
 
     // Extract PDF text
     let resumeText = "";
-
     try {
       resumeText = await extractTextFromPDF(buffer);
     } catch (pdfErr) {
       console.error("PDF parse error:", pdfErr);
-
       return NextResponse.json(
         {
           error: `PDF error: ${
             pdfErr instanceof Error ? pdfErr.message : "Unknown PDF error"
           }`,
         },
-        { status: 422 },
+        { status: 422 }
       );
     }
 
@@ -45,98 +43,79 @@ export async function POST(req: NextRequest) {
     if (!resumeText || resumeText.length < 30) {
       return NextResponse.json(
         {
-          error:
-            "Could not extract text from this PDF. Please use a text-based PDF.",
+          error: "Could not extract text from this PDF. Please upload a text-based resume PDF.",
         },
-        { status: 422 },
+        { status: 422 }
       );
     }
 
-    // Get Gemini API key
-    const apiKey = process.env.GOOGLE_API_KEY;
+    // Check for Custom API Key in headers, or fall back to Env variable
+    const customApiKey = req.headers.get("x-gemini-api-key");
+    const apiKey = customApiKey || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GOOGLE_API_KEY missing" },
-        { status: 500 },
+        { error: "Google API Key is missing. Please set it in your system or provide a custom key in Settings." },
+        { status: 500 }
       );
     }
 
-    // Build prompt
+    // Build prompt for structured JSON output
     const prompt = `
 You are an expert ATS resume analyzer and career coach.
 
-Analyze this resume professionally.
+Analyze the following resume text. You must return a JSON object with the exact keys:
+- "atsScore": a number between 0 and 100 representing the overall ATS match rating.
+- "summary": a concise 3-4 sentence professional summary highlighting the candidate's core expertise.
+- "strengths": an array of 3 key professional strengths found in the resume.
+- "weaknesses": an array of 3 areas of improvement or gaps in the resume.
+- "tips": an array of 3 actionable ATS/formatting improvement tips.
+- "questions": an array of 5 customized interview questions based on the candidate's experience.
 
-Return:
-1. ATS Score
-2. Resume Summary
-3. Strengths
-4. Weaknesses
-5. ATS Improvement Tips
-6. Interview Questions
-
-Resume:
-${resumeText.slice(0, 4000)}
+Resume Text:
+${resumeText.slice(0, 8000)}
 `;
 
-    // Call Gemini API
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt,
-                },
-              ],
-            },
-          ],
-        }),
+    // Call Gemini API using the official SDK
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
       },
-    );
-
-    console.log("Gemini status:", geminiResponse.status);
-
-    const rawResponse = await geminiResponse.text();
-
-    console.log("Gemini raw response:", rawResponse);
-
-    if (!geminiResponse.ok) {
-      return NextResponse.json(
-        {
-          error: `Gemini API failed: ${rawResponse}`,
-        },
-        { status: 502 },
-      );
-    }
-
-    const geminiData = JSON.parse(rawResponse);
-
-    const analysisText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!analysisText) {
-      return NextResponse.json(
-        { error: "Empty Gemini response." },
-        { status: 502 },
-      );
-    }
-
-    // Return result
-    return NextResponse.json({
-      text: analysisText,
     });
+
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+
+    if (!responseText) {
+      return NextResponse.json(
+        { error: "Empty response received from AI model." },
+        { status: 502 }
+      );
+    }
+
+    // Parse the structured output
+    try {
+      const parsedAnalysis = JSON.parse(responseText);
+      
+      // Basic structure validation
+      if (typeof parsedAnalysis.atsScore !== "number" || !parsedAnalysis.summary) {
+        throw new Error("Invalid structure returned by AI model.");
+      }
+
+      return NextResponse.json(parsedAnalysis);
+    } catch (parseErr) {
+      console.error("Failed to parse Gemini output as JSON:", responseText, parseErr);
+      return NextResponse.json(
+        { error: "AI model failed to return a valid JSON analysis. Please try again." },
+        { status: 502 }
+      );
+    }
+
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown server error";
-
     console.error("Route error:", message);
-
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

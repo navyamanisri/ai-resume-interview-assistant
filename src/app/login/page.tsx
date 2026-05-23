@@ -2,117 +2,123 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
-
   const [password, setPassword] = useState("");
-
   const [loading, setLoading] = useState(false);
-
   const [error, setError] = useState("");
 
-  async function handleLogin() {
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email || !password) {
+      setError("Please enter both email and password.");
+      return;
+    }
+
     try {
       setLoading(true);
-
       setError("");
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) {
-        setError(error.message);
+      if (authError) {
+        setError(authError.message);
         return;
       }
 
       router.push("/dashboard");
     } catch (err) {
       console.error(err);
-
-      setError("Something went wrong.");
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-black text-white flex items-center justify-center px-6">
-      {/* Glow */}
-      <div className="absolute top-[-200px] left-[100px] w-[500px] h-[500px] bg-purple-500/20 blur-[120px] rounded-full" />
-
-      <div className="absolute bottom-[-200px] right-[100px] w-[500px] h-[500px] bg-blue-500/20 blur-[120px] rounded-full" />
-
-      <div className="relative z-10 w-full max-w-md bg-zinc-900/70 border border-zinc-800 rounded-[32px] p-8 backdrop-blur-2xl shadow-2xl">
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-6 selection:bg-indigo-500/30 selection:text-indigo-200">
+      <div className="w-full max-w-md bg-zinc-900/30 border border-zinc-800/80 rounded-2xl p-8 backdrop-blur-md shadow-xl">
         <div className="mb-8">
-          <p className="uppercase tracking-[0.3em] text-zinc-500 text-sm mb-4">
-            AI Resume Platform
-          </p>
+          <div className="flex items-center gap-2 mb-6">
+            <Link href="/" className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center font-bold text-white text-xs">
+                AI
+              </div>
+              <span className="text-lg font-bold tracking-tight text-white">
+                ResumeAI
+              </span>
+            </Link>
+          </div>
 
-          <h1 className="text-4xl font-bold mb-4">
-            Welcome Back
-          </h1>
-
-          <p className="text-zinc-400 leading-8">
-            Login to continue your AI-powered resume analysis journey.
+          <h1 className="text-2xl font-bold text-white">Welcome Back</h1>
+          <p className="text-sm text-zinc-400 mt-2">
+            Sign in to access your dashboard and resume reports.
           </p>
         </div>
 
-        <div className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm text-zinc-400 mb-3">
-              Email
+            <label htmlFor="email" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+              Email Address
             </label>
-
             <input
+              id="email"
               type="email"
-              placeholder="Enter your email"
+              placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-white outline-none focus:border-zinc-600"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500 transition-colors"
+              required
             />
           </div>
 
           <div>
-            <label className="block text-sm text-zinc-400 mb-3">
+            <label htmlFor="password" className="block text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">
               Password
             </label>
-
             <input
+              id="password"
               type="password"
-              placeholder="Enter your password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-2xl px-5 py-4 text-white outline-none focus:border-zinc-600"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none focus:border-indigo-500 transition-colors"
+              required
             />
           </div>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-2xl p-4">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-3.5 text-sm">
               {error}
             </div>
           )}
 
           <button
-            onClick={handleLogin}
+            type="submit"
             disabled={loading}
-            className={`w-full py-4 rounded-2xl font-semibold text-lg transition-all ${
-              loading
-                ? "bg-zinc-700 cursor-not-allowed"
-                : "bg-white text-black hover:bg-zinc-200"
-            }`}
+            className="w-full bg-indigo-600 text-white py-3 rounded-xl font-medium text-sm hover:bg-indigo-500 active:scale-[0.99] transition-all disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed"
           >
-            {loading ? "Logging In..." : "Login"}
+            {loading ? "Signing In..." : "Sign In"}
           </button>
+        </form>
+
+        <div className="mt-8 text-center text-sm text-zinc-500">
+          {"Don't have an account? "}
+          <Link
+            href="/signup"
+            className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
+          >
+            Sign Up
+          </Link>
         </div>
       </div>
     </main>
   );
 }
-
